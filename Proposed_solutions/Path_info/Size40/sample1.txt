@@ -1,0 +1,3 @@
+Optimal path: [[29, 39], [2, 38], [8, 37]]
+Optimal value: 40.60127
+runtime: 7.401238918304443
