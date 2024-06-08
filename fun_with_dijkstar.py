@@ -291,7 +291,6 @@ def compare(node1, node2):
     else: return 1
 
 def solve_with_first_model(size, index, visualize = "no"):
-    # info_path = Path(__file__).parent/"Proposed_solutions"/"Path_info"/f"Size{size}"/f"sample{index}.txt"
     start_time = time.time()
     # List of all points (to be filtered and used later)
     # Note: j before i
@@ -345,13 +344,9 @@ def solve_with_first_model(size, index, visualize = "no"):
     target = grid_info["target"]
     if start not in points_list: 
         print(f"Invalid: Start is on the wall")
-        # with open(info_path, "w") as f:
-        #     f.writelines("Invalid")
         return None
     if target not in points_list: 
         print(f"Invalid: Target is on the wall")
-        # with open(info_path, "w") as f:
-        #     f.writelines("Invalid")
         return None
 
     # Nodes_info
@@ -381,14 +376,10 @@ def solve_with_first_model(size, index, visualize = "no"):
     # Second validity check (start and target both in nodes_info)
     if is_empty_dict(nodes_info[f"{start[0]}_{start[1]}"]):
         print(f"Invalid: Start is disconnected")
-        # with open(info_path, "w") as f:
-        #     f.writelines("Invalid")
         return None
 
     if is_empty_dict(nodes_info[f"{target[0]}_{target[1]}"]):
         print(f"Invalid: Target is disconnected")
-        # with open(info_path, "w") as f:
-        #     f.writelines("Invalid")
         return None
 
     else:
@@ -612,8 +603,6 @@ def solve_with_first_model(size, index, visualize = "no"):
             optimal_value = path_info[3]
         except:
             print("No path found")
-            # with open(info_path, "w") as f:
-            #     f.writelines("Invalid")
             return None
         path_list = []
         num = num_path.pop(0)
@@ -631,14 +620,8 @@ def solve_with_first_model(size, index, visualize = "no"):
         print(f"Optimal path: {path_list}")
         print(f"Optimal value: {optimal_value}")
         runtime = time.time() - start_time
-        print(f"runtime: {runtime}")
+        print(f"runtime (s): {runtime}")
 
-        # with open(info_path, "w") as f:
-        #     f.writelines(f"Optimal path: {path_list}\n")
-        #     f.writelines(f"Optimal value: {optimal_value}\n")
-        #     f.writelines(f"runtime: {runtime}\n")
-
-        # visualize_path = Path(__file__).parent/"Proposed_solutions"/"Visualize"/f"Size{size}"/f"sample{index}.png"
         # Visualize
         if visualize == "yes":
             row, column = size, size
@@ -661,8 +644,6 @@ def solve_with_first_model(size, index, visualize = "no"):
                 )
             ax.plot(x_coords, y_coords, color="g", linewidth=0.2)
             ax.axis("scaled")
-            # fig.savefig(visualize_path, bbox_inches="tight")
-            # plt.close(fig)
             plt.show()
 
 """
@@ -689,7 +670,6 @@ vẽ sau.
 """
 
 def solve_with_second_model(size, index, visualize = "no"):
-    # info_path = Path(__file__).parent/"Proposed_solutions"/"Path_info"/f"Size{size}"/f"sample{index}.txt"
     start_time = time.time()
     # List of all points (to be filtered and used later)
     # Note: j before i
@@ -743,13 +723,9 @@ def solve_with_second_model(size, index, visualize = "no"):
     target = grid_info["target"]
     if start not in points_list: 
         print(f"Invalid: Start is on the wall")
-        # with open(info_path, "w") as f:
-        #     f.writelines("Invalid")
         return None
     if target not in points_list: 
         print(f"Invalid: Target is on the wall")
-        # with open(info_path, "w") as f:
-        #     f.writelines("Invalid")
         return None
 
     # Nodes_info
@@ -779,14 +755,10 @@ def solve_with_second_model(size, index, visualize = "no"):
     # Second validity check (start and target both in nodes_info)
     if is_empty_dict(nodes_info[f"{start[0]}_{start[1]}"]):
         print(f"Invalid: Start is disconnected")
-        # with open(info_path, "w") as f:
-        #     f.writelines("Invalid")
         return None
 
     if is_empty_dict(nodes_info[f"{target[0]}_{target[1]}"]):
         print(f"Invalid: Target is disconnected")
-        # with open(info_path, "w") as f:
-        #     f.writelines("Invalid")
         return None
     
     else:
@@ -824,8 +796,6 @@ def solve_with_second_model(size, index, visualize = "no"):
             optimal_value = path_info[3]
         except:
             print("No path found")
-            # with open(info_path, "w") as f:
-            #     f.writelines("Invalid")
             return None
         points_path = []
         for num in nums_path:
@@ -833,14 +803,8 @@ def solve_with_second_model(size, index, visualize = "no"):
         print(f"Optimal path: {points_path}")
         print(f"Optimal value {optimal_value}")
         runtime = time.time() - start_time
-        print(f"runtime: {runtime}")
+        print(f"runtime (s): {runtime}")
 
-        # with open(info_path, "w") as f:
-        #     f.writelines(f"Optimal path: {points_path}\n")
-        #     f.writelines(f"Optimal value: {optimal_value}\n")
-        #     f.writelines(f"runtime: {runtime}\n")
-
-        # visualize_path = Path(__file__).parent/"Proposed_solutions"/"Visualize"/f"Size{size}"/f"sample{index}.png"
         # Visualize
         if visualize == "yes":
             row, column = size, size
@@ -863,8 +827,4 @@ def solve_with_second_model(size, index, visualize = "no"):
                 )
             ax.plot(x_coords, y_coords, color="g", linewidth=0.2)
             ax.axis('scaled')
-            # fig.savefig(visualize_path, bbox_inches="tight")
-            # plt.close(fig)
             plt.show()
-
-# solve_with_second_model(70, 1, "yes")
