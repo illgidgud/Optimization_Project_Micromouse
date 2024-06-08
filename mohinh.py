@@ -52,7 +52,7 @@ def get_maximum_number_of_vertices(size, index):
     redundant_points = list(redundant_points)
     return size**2 - len(redundant_points)
 
-# Hàm giải mê cung với số bước cố định chọn trước
+# Hàm giải với số bước cố định chọn trước
 def solve_maze_with_given_step(size, index, step, status = "optimal"):
     """
     Solve given maze for a solution with fixed number of steps, optimal
@@ -64,10 +64,14 @@ def solve_maze_with_given_step(size, index, step, status = "optimal"):
     # Look for any feasible solution if 'status' = "feasible"
     if status == "feasible": model.params.SolutionLimit = 1
 
+    # Generation of nodes through pre-written data, only available for
+    # existing samples of size 40*40 and below. In the long run, an
+    # in-program generation is prefered. This will be made if there are
+    # good chances for execution of 40*40 mazes.
     nodes_path = Path(__file__).parent/"Unreachable_nodes"/f"Size{size}"/f"sample{index}.json"
-    grid_path = Path(__file__).parent/"Samples"/f"Size{size}"/f"sample{index}.json"
     with open(nodes_path, "r") as f:
-        cac_dinh = json.load(f)
+        unreachable_nodes = json.load(f)
+    grid_path = Path(__file__).parent/"Samples"/f"Size{size}"/f"sample{index}.json"
     with open(grid_path, "r") as f:
         maze = json.load(f)
     start = maze["start"]
@@ -213,7 +217,7 @@ def solve_maze_with_given_step(size, index, step, status = "optimal"):
 
     # Điều kiện không chạm tường, được xử lý trước bằng một bước riêng biệt
     for i, j in points_list:
-        unreachable_points = cac_dinh[f"{i}_{j}"]
+        unreachable_points = unreachable_nodes[f"{i}_{j}"]
         for k in range(1, N):
             # Mô tả điều kiện: Nếu x[i, j, k] = 1 thì tổng các x[i', j', k + 1] bằng 0,
             # với (i', j') là một đỉnh trong 'unreachable_points' của (i, j)
@@ -237,6 +241,7 @@ def solve_maze_with_given_step(size, index, step, status = "optimal"):
         return True, model.ObjVal
     else: return False, 0
 
+# Hàm giải với số bước không quá một chặn trên cho trước
 def solve_for_solution_with_bounded_steps(size, index, step_bound, status = "optimal"):
     """
     Solve given maze for solution, optimal if 'status' = "optimal", else
@@ -255,7 +260,7 @@ def solve_for_solution_with_bounded_steps(size, index, step_bound, status = "opt
     nodes_path = Path(__file__).parent/"Unreachable_nodes"/f"Size{size}"/f"sample{index}.json"
     grid_path = Path(__file__).parent/"Samples"/f"Size{size}"/f"sample{index}.json"
     with open(nodes_path, "r") as f:
-        cac_dinh = json.load(f)
+        unreachable_nodes = json.load(f)
     with open(grid_path, "r") as f:
         maze = json.load(f)
     start = maze["start"]
@@ -400,7 +405,7 @@ def solve_for_solution_with_bounded_steps(size, index, step_bound, status = "opt
 
     # Điều kiện không chạm tường, được xử lý trước bằng một bước riêng biệt
     for i, j in points_list:
-        unreachable_points = cac_dinh[f"{i}_{j}"]
+        unreachable_points = unreachable_nodes[f"{i}_{j}"]
         for k in range(1, N):
             # Mô tả điều kiện: Nếu x[i, j, k] = 1 thì tổng các x[i', j', k + 1] bằng 0,
             # với (i', j') là một đỉnh trong 'unreachable_points' của (i, j)
@@ -423,6 +428,7 @@ def solve_for_solution_with_bounded_steps(size, index, step_bound, status = "opt
         return True, model.ObjVal
     else: return False, 0   
 
+# Hàm giải "tổng quát"
 def solve_maze(size, index, bound_for_feasibility = None, status_for_feasibility = "optimal", method: int = 2):
     """
     Solve given maze.
@@ -449,7 +455,7 @@ def solve_maze(size, index, bound_for_feasibility = None, status_for_feasibility
     nodes_path = Path(__file__).parent/"Unreachable_nodes"/f"Size{size}"/f"sample{index}.json"
     grid_path = Path(__file__).parent/"Samples"/f"Size{size}"/f"sample{index}.json"
     with open(nodes_path, "r") as f:
-        cac_dinh = json.load(f)
+        unreachable_nodes = json.load(f)
     with open(grid_path, "r") as f:
         maze = json.load(f)
     start = maze["start"]
@@ -624,7 +630,7 @@ def solve_maze(size, index, bound_for_feasibility = None, status_for_feasibility
 
     # Điều kiện không chạm tường, được xử lý trước bằng một bước riêng biệt
     for i, j in points_list:
-        unreachable_points = cac_dinh[f"{i}_{j}"]
+        unreachable_points = unreachable_nodes[f"{i}_{j}"]
         for k in range(1, N):
             # Mô tả điều kiện: Nếu x[i, j, k] = 1 thì tổng các x[i', j', k + 1] bằng 0,
             # với (i', j') là một đỉnh trong 'unreachable_points' của (i, j)
@@ -650,4 +656,4 @@ def solve_maze(size, index, bound_for_feasibility = None, status_for_feasibility
                 if x[i, j, k].x == 1:
                     print(f"{k}_th vertex: ({i}, {j})")
 
-solve_maze(20, 1, 20, "feasible", 1)
+# solve_maze(20, 1, 20, "feasible", 1)
