@@ -4,6 +4,7 @@ import gurobipy as gp
 from gurobipy import GRB
 import numpy as np
 import math
+import time
 
 class Constant:
     """
@@ -15,6 +16,91 @@ class Constant:
     # of channel Veritasium, from 10:40 to 11:20.
     acute = 7.5
     obtuse_or_right = 3.75
+
+# Check intersection
+def check_intersection(point1, point2, edge):
+    """
+    Check intersection of segment ['point1', 'point2'] with 'edge'
+    """
+    a1, b1, a2, b2 = edge[0][0], edge[0][1], edge[1][0], edge[1][1]
+    x1, y1, x2, y2 = point1[0], point1[1], point2[0], point2[1]
+    """
+    Solve the following system
+    u*(a1 - a2) - v*(x1 - x2) = x2 - a2
+    u*(b1 - b2) - v*(y1 - y2) = y2 - b2
+    Condition of intersection: u, v in [0, 1]
+    """
+    d = (a2 - a1)*(y1 - y2) + (b1 - b2)*(x1 - x2)
+    d1 = (a2 - x2)*(y1 - y2) + (y2 - b2)*(x1 - x2)
+    d2 = (a1 - a2)*(y2 - b2) + (b2 - b1)*(x2 - a2)
+    if d == 0:
+        if d1 != 0 or d2 != 0: return False
+        else:
+            a12 = a1 - a2
+            if a12 == 0:
+                b12 = b1 - b2
+                y12 = y1 - y2
+                y1b2 = y1 - b2
+                y2b1 = y2 - b1
+                y1b1 = y1 - b1
+                y2b2 = y2 - b2
+                if b12 > 0 and y12 > 0:
+                    return (y1b2 >= 0 and y2b1 <= 0)
+                elif b12 > 0 and y12 < 0:
+                    return (y2b2 >= 0 and y1b1 <= 0)
+                elif b12 < 0 and y12 > 0:
+                    return (y2b2 <= 0 and y1b1 >= 0)
+                else:
+                    return (y1b2 <= 0 and y2b1 >= 0)
+            else:
+                x12 = x1 - x2
+                x1a2 = x1 - a2
+                x2a1 = x2 - a1
+                x1a1 = x1 - a1
+                x2a2 = x2 - a2
+                if a12 > 0 and x12 > 0:
+                    return (x1a2 >= 0 and x2a1 <= 0)
+                elif a12 > 0 and x12 < 0:
+                    return (x2a2 >= 0 and x1a1 <= 0)
+                elif a12 < 0 and x12 > 0:
+                    return (x2a2 <= 0 and x1a1 >= 0)
+                else:
+                    return (x1a2 <= 0 and x2a1 >= 0)
+                
+    else:
+        cond_u = (all([d > 0, d1 >= 0, d1 - d <= 0]) or all([d < 0, d1 <= 0, d1 - d >= 0]))
+        cond_v = (all([d > 0, d2 >= 0, d2 - d <= 0]) or all([d < 0, d2 <= 0, d2 - d >= 0]))
+        return all([cond_u, cond_v])
+
+# Get reach from a point
+def get_furthest_reach(point, slope, row, col, edge_list):
+    """
+    Get furthest expansion from 'point' in the direction given by 'slope',
+    in a 'row'*'col' grid with 'edge_list' as obstacles.
+    """
+    current_col, current_row = point[0], point[1]
+    col_slope, row_slope = slope[0], slope[1]
+    # Get maximum column reach
+    if col_slope == 0: max_col_reach = col
+    elif col_slope > 0: max_col_reach = int((col - current_col) / col_slope) + 1
+    else: max_col_reach = int((current_col - 1) / (-col_slope)) + 1
+    # Get maximum row reach
+    if row_slope == 0: max_row_reach = row
+    else: max_row_reach = int((row - current_row) / row_slope) + 1
+
+    min_reach = 0
+    max_reach = min(max_row_reach, max_col_reach)
+    while max_reach - min_reach > 1:
+        temp = min_reach
+        new_reach = int((max_reach + min_reach) / 2)
+        min_reach = new_reach
+        test_point = [current_col + new_reach * col_slope, current_row + new_reach * row_slope]
+        for edge in edge_list:
+            if check_intersection(point, test_point, edge):
+                max_reach = new_reach
+                min_reach = temp
+                break
+    return min_reach
 
 # Get points on a segment, for first-stage filtering of redundant vertices,
 # among other purposes
@@ -52,6 +138,173 @@ def get_maximum_number_of_vertices(size, index):
     redundant_points = list(redundant_points)
     return size**2 - len(redundant_points)
 
+# Sort edge_list, for faster execution
+def sort_edge_list(edge_list):
+    """
+    Sort edge_list by length of edge, from longest to shortest, using
+    taxicab distance
+    """
+    return sorted(
+        edge_list, 
+        key=lambda x: abs(x[0][0] - x[1][0]) + abs(x[0][1] - x[1][1]),
+        reverse=True,
+    )
+
+# Slopes generator
+# Reduce a slope
+def reduce_tuple(iter):
+    """
+    Reduce the iterable (a, b)
+    """
+    a, b = iter[0], iter[1]
+    d = math.gcd(a, b)
+    return (int(a/d), int(b/d))
+
+# Get available slopes from a specified position
+# Note: This method uses a set, which means order will change each run
+def get_slopes(current_col, current_row, row, col):
+    """
+    Return list of slopes for point ('i', 'j') in a
+    'row' * 'col' grid. A slope is represented as an
+    irreducible list [a, b], in the right-upward direction (i.e b > 0,
+    or b = 0 and a > 0)
+    """
+    slope_set = set()
+    if current_col < col:
+        slope_set.add((1, 0))
+    for row_index in range(current_row + 1, row + 1):
+        for col_index in range(1, col + 1):
+            slope_set.add(reduce_tuple((col_index - current_col, row_index - current_row)))
+    return list(slope_set)
+
+# Generate slopes for square grids, put save = "yes" for local save of slopes.
+# Return None if save = "yes"
+def generate_slopes(size, save="no"):
+    """
+    Generate slopes for square grids, put save = "yes" for local save of slopes.
+    Return None if save = "yes"
+    """
+    slope_dict = dict()
+    for current_row in range (1, size + 1):
+        for current_col in range (1, size + 1):
+            slope_dict[f"{current_col}_{current_row}"] = get_slopes(
+                current_col, current_row, size, size,
+            )
+    if save == "yes":
+        path = Path(__file__).parent/"Slopes"/f"Size{size}"
+        with open(path, "w") as f:
+            json.dump(slope_dict, f, indent=1)
+            return None
+    return slope_dict
+
+# Generate unreachable_nodes
+def get_unreachable_nodes(size, index):
+    """
+    In-program generation of unreachable_nodes
+    """
+    # List of all points (to be filtered and used later)
+    # Note: j before i
+    points_list = [[i, j] for j in range(1, size + 1) for i in range(1, size + 1)]
+
+    unreachable_nodes = {
+        f"{i}_{j}": []
+        for j in range(1, size + 1) for i in range(1, size + 1)
+    }
+
+    # Two options for nodes_slopes, one through local save, another through
+    # in-program generation. Testing seems to prefer the save and read option.
+    slopes_path = Path(__file__).parent/"Slopes"/f"Size{size}"
+    with open(slopes_path, "r") as f:
+        node_slopes = json.load(f)
+
+    # node_slopes = generate_slopes(size=size)
+
+    grid_path = Path(__file__).parent/"Samples"/f"Size{size}"/f"sample{index}.json"
+    with open(grid_path, "r") as f:
+        grid_info = json.load(f)
+
+    # Get edges, then sort (for faster execution)
+    edges = grid_info["edges"]
+    edges = sort_edge_list(edge_list=edges)
+    redundant_points = set()
+    # Filter redundant points from points_list
+    for edge in edges:
+        points_to_remove = get_points_between(edge[0], edge[1])
+        for point in points_to_remove:
+            # remove from points_list
+            try:
+                points_list.remove(point)
+            except:
+                pass
+
+            # remove from unreachable_nodes
+            key = f"{point[0]}_{point[1]}"
+            try:
+                del unreachable_nodes[key]
+            except:
+                pass
+            # add to redundant_points
+            redundant_points.add(tuple(point))
+    redundant_points = list(redundant_points)
+
+    # Generate unreachable_nodes
+    for current_col, current_row in points_list:
+        point = [current_col, current_row]
+        for slope in node_slopes[f"{current_col}_{current_row}"]:
+            # The following is to get the furthest possible reach in a
+            # given direction
+            col_slope, row_slope = slope[0], slope[1]
+            # Get maximum column reach
+            if col_slope == 0: max_col_reach = size
+            elif col_slope > 0: max_col_reach = int((size - current_col) / col_slope) + 1
+            else: max_col_reach = int((current_col - 1) / (-col_slope)) + 1
+            # Get maximum row reach
+            if row_slope == 0: max_row_reach = size
+            else: max_row_reach = int((size - current_row) / row_slope) + 1
+
+            min_reach = 0
+            max_reach = min(max_row_reach, max_col_reach)
+            max_valid_reach = max_reach - 1
+            while max_reach - min_reach > 1:
+                temp = min_reach
+                new_reach = int((max_reach + min_reach) / 2)
+                min_reach = new_reach
+                test_point = [current_col + new_reach * col_slope, current_row + new_reach * row_slope]
+                for edge in edges:
+                    if check_intersection(point, test_point, edge):
+                        max_reach = new_reach
+                        min_reach = temp
+                        break
+
+            first_group = []
+            second_group = []
+
+            for i in range(min_reach + 1):
+                point_to_add = [current_col + i * col_slope, current_row + i * row_slope]
+                if tuple(point_to_add) not in redundant_points:
+                    first_group.append(point_to_add)
+
+            for i in range(min_reach + 1, max_valid_reach + 1):
+                point_to_add = [current_col + i * col_slope, current_row + i * row_slope]
+                if tuple(point_to_add) not in redundant_points:
+                    second_group.append(point_to_add)
+
+            for checkpoint in second_group:
+                key = f"{checkpoint[0]}_{checkpoint[1]}"
+                unreachable_nodes[key] += first_group
+                
+            first_point = first_group.pop(0)
+            key = f"{first_point[0]}_{first_point[1]}"
+            unreachable_nodes[key] += second_group
+            for checkpoint in first_group:
+                key = f"{checkpoint[0]}_{checkpoint[1]}"
+                unreachable_nodes[key] += second_group
+                try:
+                    node_slopes[key].remove(slope)
+                except:
+                    pass
+    return unreachable_nodes
+
 # Hàm giải với số bước cố định chọn trước
 def solve_maze_with_given_step(size, index, step, status = "optimal"):
     """
@@ -66,11 +319,14 @@ def solve_maze_with_given_step(size, index, step, status = "optimal"):
 
     # Generation of nodes through pre-written data, only available for
     # existing samples of size 40*40 and below. In the long run, an
-    # in-program generation is prefered. This will be made if there are
-    # good chances for execution of 40*40 mazes.
+    # in-program generation is prefered.
     nodes_path = Path(__file__).parent/"Unreachable_nodes"/f"Size{size}"/f"sample{index}.json"
     with open(nodes_path, "r") as f:
         unreachable_nodes = json.load(f)
+
+    # In-program generation
+    # unreachable_nodes = get_unreachable_nodes(size, index)
+
     grid_path = Path(__file__).parent/"Samples"/f"Size{size}"/f"sample{index}.json"
     with open(grid_path, "r") as f:
         maze = json.load(f)
@@ -261,6 +517,10 @@ def solve_for_solution_with_bounded_steps(size, index, step_bound, status = "opt
     grid_path = Path(__file__).parent/"Samples"/f"Size{size}"/f"sample{index}.json"
     with open(nodes_path, "r") as f:
         unreachable_nodes = json.load(f)
+
+    # In-program generation
+    # unreachable_nodes = get_unreachable_nodes(size, index)
+
     with open(grid_path, "r") as f:
         maze = json.load(f)
     start = maze["start"]
@@ -445,6 +705,7 @@ def solve_maze(size, index, bound_for_feasibility = None, status_for_feasibility
     obtained from the feasible objective value found above, thereby 
     decreasing the size of the final model, raising solvability.
     """
+    start_time = time.time()
     # Thiết lập mô hình
     model = gp.Model()
 
@@ -456,6 +717,10 @@ def solve_maze(size, index, bound_for_feasibility = None, status_for_feasibility
     grid_path = Path(__file__).parent/"Samples"/f"Size{size}"/f"sample{index}.json"
     with open(nodes_path, "r") as f:
         unreachable_nodes = json.load(f)
+
+    # In-program generation
+    # unreachable_nodes = get_unreachable_nodes(size, index)
+
     with open(grid_path, "r") as f:
         maze = json.load(f)
     start = maze["start"]
@@ -493,27 +758,32 @@ def solve_maze(size, index, bound_for_feasibility = None, status_for_feasibility
     # gồm một lần quay. Do đó, mỗi bước đi sẽ tốn ít nhất 1 + 3.75 = 4.75 đvtg.đvtg
     # Có N - 1 bước đi như vậy.
     else:
-        print(f"Begin step one: Finding a {status_for_feasibility} solution within range of {bound_for_feasibility} vertices")
+        print(f"*\n*\n*\n*\n*")
+        print(f"Begin step one: Finding a {status_for_feasibility} solution within range of {bound_for_feasibility} vertices using method {method}")
         if method == 1:
             count = 2
             for step in range(2, bound_for_feasibility + 1):
                 info = solve_maze_with_given_step(size, index, step, status_for_feasibility)
                 if info[0]:
                     N = int(info[1]/4.75) + 2
+                    print(f"*\n*\n*\n*\n*")
                     print(f"Obtained a bound for maximum number of vertices: {N}")
                     print(f"Begin step two: Solving given maze with maximum {N} vertices")
                     break
                 count += 1
             if count == bound_for_feasibility + 1:
+                print(f"*\n*\n*\n*\n*")
                 print(f"No feasible solution found with given range of {bound_for_feasibility} vertices")
                 return None
         elif method == 2:
             info = solve_for_solution_with_bounded_steps(size, index, bound_for_feasibility, status_for_feasibility)
             if info[0]:
                 N = int(info[1]/4.75) + 2
+                print(f"*\n*\n*\n*\n*")
                 print(f"Obtained a bound for maximum number of vertices: {N}")
                 print(f"Begin step two: Solving given maze with maximum {N} vertices")
             else:
+                print(f"*\n*\n*\n*\n*")
                 print(f"No feasible solution found with given range of {bound_for_feasibility} vertices")
                 return None
 
@@ -655,5 +925,5 @@ def solve_maze(size, index, bound_for_feasibility = None, status_for_feasibility
             for i, j in points_list:
                 if x[i, j, k].x == 1:
                     print(f"{k}_th vertex: ({i}, {j})")
-
-# solve_maze(20, 1, 20, "feasible", 1)
+    runtime = time.time() - start_time
+    print(f"Runtime (s): {runtime}")
