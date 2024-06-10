@@ -766,6 +766,7 @@ def solve_maze(size, index, bound_for_feasibility = None, status_for_feasibility
                 info = solve_maze_with_given_step(size, index, step, status_for_feasibility)
                 if info[0]:
                     N = int(info[1]/4.75) + 2
+                    obj_val = info[1]
                     print(f"*\n*\n*\n*\n*")
                     print(f"Obtained a bound for maximum number of vertices: {N}")
                     print(f"Begin step two: Solving given maze with maximum {N} vertices")
@@ -779,6 +780,7 @@ def solve_maze(size, index, bound_for_feasibility = None, status_for_feasibility
             info = solve_for_solution_with_bounded_steps(size, index, bound_for_feasibility, status_for_feasibility)
             if info[0]:
                 N = int(info[1]/4.75) + 2
+                obj_val = info[1]
                 print(f"*\n*\n*\n*\n*")
                 print(f"Obtained a bound for maximum number of vertices: {N}")
                 print(f"Begin step two: Solving given maze with maximum {N} vertices")
@@ -914,7 +916,7 @@ def solve_maze(size, index, bound_for_feasibility = None, status_for_feasibility
     # model.addConstr(count[2] == 1)
 
     # Chặn trên đã biết cho hàm mục tiêu (nếu có)
-    # model.addConstr(obj <= solve_maze_with_given_step(size, index, step)[1]+0.01)
+    model.addConstr(obj <= obj_val + 0.01)
 
     model.optimize()
     # In ra thông tin về quãng đường
@@ -927,3 +929,5 @@ def solve_maze(size, index, bound_for_feasibility = None, status_for_feasibility
                     print(f"{k}_th vertex: ({i}, {j})")
     runtime = time.time() - start_time
     print(f"Runtime (s): {runtime}")
+
+# solve_maze(40, 3, 5, "feasible", 2)
